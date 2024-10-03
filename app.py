@@ -36,12 +36,6 @@ if not st.session_state["language_selected"]:
     # Proceed button with a callback function
     st.button("Proceed", on_click=proceed, args=(language,))
 
-# Check if Spanish is selected
-if st.session_state["language"] == "Spanish":
-    # Show an under-construction message for the Spanish page
-    st.title("Guía en Construcción")
-    st.write("La guía para el idioma Español está en construcción. Por favor, vuelva más tarde.")
-
 # # Check if English is selected
 # elif st.session_state["language"] == "English":
 else:
