@@ -91,7 +91,7 @@ def insert_toc(content):
 def load_markdown_file_with_images(filename, folder, language):
     """Load markdown content, display images with captions, and render text."""
     # Construct the file path based on the selected language
-    base_path = f"docs/{language}/{folder}/{filename}"
+    base_path = f"docs/{language.lower()}/{folder}/{filename}"
     
     if os.path.exists(base_path):
         with open(base_path, 'r', encoding='utf-8') as f:
@@ -130,7 +130,7 @@ def load_markdown_file_with_images(filename, folder, language):
 def get_first_level_headers(language, folder, filenames):
     headers = []
     for filename in filenames:
-        base_path = f"docs/{language}/{folder}/{filename}"
+        base_path = f"docs/{language.lower()}/{folder}/{filename}"
         try:
             with open(base_path, 'r', encoding='utf-8') as file:
                 for line in file:
@@ -144,9 +144,7 @@ def get_first_level_headers(language, folder, filenames):
 
 def load_sidebar_tabs(language, folder="docs"):
     """Load tabs from the side_bar.md file based on the selected language."""
-    sidebar_file_path = f"{folder}/{language}/side_bar.md"
-    # Debugging: Log the file path and check if it exists
-    st.write(f"Attempting to load sidebar file from: {sidebar_file_path}")
+    sidebar_file_path = f"{folder}/{language.lower()}/side_bar.md"
 
     if os.path.exists(sidebar_file_path):
         with open(sidebar_file_path, 'r', encoding='utf-8') as f:
@@ -210,7 +208,7 @@ def run_code_editor(default_code, backend_vars=None, height=[2,6]):
 def load_markdown_file_with_images_and_code(filename, folder, language):
     """Load markdown content, display images with captions, render text, and execute code blocks."""
     # Construct the file path based on the selected language
-    base_path = f"docs/{language}/{folder}/{filename}"
+    base_path = f"docs/{language.lower()}/{folder}/{filename}"
     
     if os.path.exists(base_path):
         with open(base_path, 'r', encoding='utf-8') as f:
