@@ -145,6 +145,8 @@ def get_first_level_headers(language, folder, filenames):
 def load_sidebar_tabs(language, folder="docs"):
     """Load tabs from the side_bar.md file based on the selected language."""
     sidebar_file_path = f"{folder}/{language}/side_bar.md"
+    # Debugging: Log the file path and check if it exists
+    st.write(f"Attempting to load sidebar file from: {sidebar_file_path}")
 
     if os.path.exists(sidebar_file_path):
         with open(sidebar_file_path, 'r', encoding='utf-8') as f:
