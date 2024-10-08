@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import os
 import re
 import streamlit as st
@@ -5,6 +6,7 @@ from code_editor import code_editor
 import io
 import sys
 import json
+
 
 def generate_header_id(header_text):
     """Generate a valid HTML id from the header text by removing special characters."""
@@ -156,14 +158,14 @@ def load_sidebar_tabs(language, folder="docs"):
         st.error(f"Sidebar file not found for language: {language}. Check the file path.")
         return []  # Return an empty list if file not found
 
-def run_code_editor(default_code, backend_vars=None, height=[2,6]):
+def run_code_editor(default_code, global_namespace, height=[2,6]):
     """
-    Run the code editor in Streamlit with optional backend variables.
+    Run the code editor in Streamlit with a shared global namespace.
 
     Args:
         default_code (str): The default Python code to show in the editor.
-        backend_vars (dict): A dictionary of variables/functions to be accessible in the editor.
-        custom_buttons (list): A list of custom buttons for the editor.
+        global_namespace (dict): A dictionary shared between all code cells for global variables/functions.
+        height (list): The height of the code editor component.
     """
     # JSON for the custom buttons (including "Run")
     with open('custom/buttons_code_cells.json') as json_button_file:
@@ -186,12 +188,9 @@ def run_code_editor(default_code, backend_vars=None, height=[2,6]):
         old_stdout = sys.stdout
         sys.stdout = buffer = io.StringIO()
 
-        # Prepare local variables (backend variables/functions)
-        local_vars = backend_vars if backend_vars else {}
-
         try:
-            # Execute the user's code with access to backend variables/functions
-            exec(code, {}, local_vars)
+            # Execute the user's code in the shared global namespace
+            exec(code, global_namespace)  # Only global_namespace is passed here
         except IndentationError as e:
             st.error(f"Indentation Error: {e}")
         except Exception as e:
@@ -205,7 +204,12 @@ def run_code_editor(default_code, backend_vars=None, height=[2,6]):
         # Reset stdout
         sys.stdout = old_stdout
 
-def load_markdown_file_with_images_and_code(filename, folder, language):
+        # Check if any matplotlib plots were created and display them
+        if plt.get_fignums():  # Check if there are any active figures
+            st.pyplot(plt.gcf())  # Display the current figure
+            plt.close('all')  # Close the plot to prevent duplication in subsequent cells
+
+def load_markdown_file_with_images_and_code(filename, folder, global_namespace, language):
     """Load markdown content, display images with captions, render text, and execute code blocks."""
     # Construct the file path based on the selected language
     base_path = f"docs/{language.lower()}/{folder}/{filename}"
@@ -238,7 +242,7 @@ def load_markdown_file_with_images_and_code(filename, folder, language):
                     in_code_block = False
                     # Render the code block
                     code = '\n'.join(code_buffer)
-                    run_code_editor(code)
+                    run_code_editor(code, global_namespace)
                     code_buffer = []
             elif in_code_block:
                 # Collect lines for the current code block
