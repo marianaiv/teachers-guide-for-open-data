@@ -161,17 +161,10 @@ def load_sidebar_tabs(language, folder="docs"):
 def run_code_editor(default_code, global_namespace, height=[2,6]):
     """
     Run the code editor in Streamlit with a shared global namespace.
-
-    Args:
-        default_code (str): The default Python code to show in the editor.
-        global_namespace (dict): A dictionary shared between all code cells for global variables/functions.
-        height (list): The height of the code editor component.
     """
-    # JSON for the custom buttons (including "Run")
     with open('custom/buttons_code_cells.json') as json_button_file:
         custom_buttons = json.load(json_button_file)
 
-    # Ace code editor with Python syntax highlighting and custom buttons
     response_dict = code_editor(
         default_code,
         lang="python",
@@ -180,88 +173,107 @@ def run_code_editor(default_code, global_namespace, height=[2,6]):
         buttons=custom_buttons
     )
 
-    # Check if the "Run" button in the editor was clicked
     if response_dict['type'] == "submit" and len(response_dict['text']) != 0:
         code = response_dict['text']
-
-        # Redirect stdout to capture print statements
         old_stdout = sys.stdout
         sys.stdout = buffer = io.StringIO()
 
         try:
-            # Execute the user's code in the shared global namespace
-            exec(code, global_namespace)  # Only global_namespace is passed here
+            exec(code, global_namespace)
         except IndentationError as e:
             st.error(f"Indentation Error: {e}")
         except Exception as e:
             st.error(f"Error: {e}")
 
-        # Get the output and display it in a non-editable block
         output = buffer.getvalue()
         if output:
-            st.code(output, language="python")  # Use `st.code` to display the output as non-editable text
+            st.code(output, language="python")
 
-        # Reset stdout
         sys.stdout = old_stdout
 
-        # Check if any matplotlib plots were created and display them
-        if plt.get_fignums():  # Check if there are any active figures
-            st.pyplot(plt.gcf())  # Display the current figure
-            plt.close('all')  # Close the plot to prevent duplication in subsequent cells
+        if plt.get_fignums():
+            st.pyplot(plt.gcf())
+            plt.close('all')
 
 def load_markdown_file_with_images_and_code(filename, folder, global_namespace, language):
-    """Load markdown content, display images with captions, render text, and execute code blocks."""
-    # Construct the file path based on the selected language
+    """Load markdown content, display images, code, and alerts in the correct order."""
     base_path = f"docs/{language.lower()}/{folder}/{filename}"
-    
+
     if os.path.exists(base_path):
         with open(base_path, 'r', encoding='utf-8') as f:
             content = f.read()
 
-        # Insert Table of Contents (TOC) only if there are second or third level headers
         insert_toc(content)
 
-        # Variables to hold parsed content
         markdown_buffer = []
         in_code_block = False
         code_buffer = []
+        in_alert_block = False
+        alert_type = None
+        alert_buffer = []
 
-        # Parse the content and handle images, text, and code in the correct order
+        alert_start_re = re.compile(r'> \[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]')
+        alert_end_re = re.compile(r'> \[!END\]')
+
         for line in content.splitlines():
-            # Detect start or end of a code block
             if line.startswith("```"):
                 if not in_code_block:
-                    # Start of a new code block
                     in_code_block = True
-                    # If there's any accumulated markdown content, render it
+                    # Render any accumulated markdown content before the code block
                     if markdown_buffer:
                         st.markdown('\n'.join(markdown_buffer), unsafe_allow_html=True)
                         markdown_buffer = []
                 else:
-                    # End of a code block
                     in_code_block = False
-                    # Render the code block
                     code = '\n'.join(code_buffer)
                     run_code_editor(code, global_namespace)
                     code_buffer = []
             elif in_code_block:
-                # Collect lines for the current code block
                 code_buffer.append(line)
+            elif in_alert_block:
+                # Check if it's the end of an alert block
+                if alert_end_re.match(line):
+                    in_alert_block = False
+                    alert_text = '\n'.join(alert_buffer).strip()
+
+                    # Render the alert using Streamlit components
+                    if alert_type == "NOTE":
+                        st.info(alert_text)
+                    elif alert_type == "TIP":
+                        st.success(alert_text)
+                    elif alert_type == "IMPORTANT":
+                        st.warning(alert_text)
+                    elif alert_type == "WARNING":
+                        st.error(alert_text)
+                    elif alert_type == "CAUTION":
+                        st.warning(alert_text)
+                    
+                    alert_buffer = []  # Clear the buffer for the next alert
+                else:
+                    alert_buffer.append(line)
             else:
-                # Check if the line contains an image markdown syntax: ![caption](image_path)
-                image_match = re.match(r'!\[(.*?)\]\((.*?)\)', line)
-                if image_match:
-                    # Extract caption and image path
-                    caption, img_path = image_match.groups()
-                    # Render any accumulated markdown content before the image
+                # Check if the line contains an alert start
+                if alert_start_re.match(line):
+                    # Render any accumulated markdown content before starting the alert
                     if markdown_buffer:
                         st.markdown('\n'.join(markdown_buffer), unsafe_allow_html=True)
                         markdown_buffer = []
-                    # Display the image
-                    st.image(img_path, caption=caption, width=650)
+
+                    alert_type = alert_start_re.match(line).group(1)
+                    in_alert_block = True
                 else:
-                    # Add the line to the markdown buffer if it's not an image or code block
-                    markdown_buffer.append(line)
+                    image_match = re.match(r'!\[(.*?)\]\((.*?)\)', line)
+                    if image_match:
+                        # Render any accumulated markdown content before the image
+                        if markdown_buffer:
+                            st.markdown('\n'.join(markdown_buffer), unsafe_allow_html=True)
+                            markdown_buffer = []
+
+                        caption, img_path = image_match.groups()
+                        st.image(img_path, caption=caption, width=650)
+                    else:
+                        # Add the line to the markdown buffer if it's not an image or code block
+                        markdown_buffer.append(line)
 
         # Render any remaining markdown content
         if markdown_buffer:
@@ -269,3 +281,13 @@ def load_markdown_file_with_images_and_code(filename, folder, global_namespace, 
 
     else:
         st.error(f"File not found for language: {language}. Check the file path.")
+
+def load_markdown_preview(filename, folder, language, lines=3):
+    # Load the markdown file
+    full_path = f"docs/{language.lower()}/{folder}/{filename}"
+    with open(full_path, "r") as file:
+        content = file.readlines()
+    
+    # Get the first few lines for the preview
+    preview = "".join(content[:lines]).strip()
+    return preview
